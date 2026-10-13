@@ -19,7 +19,8 @@
 \renewcommand{\citepunct}{], [}
 \renewcommand{\citedash}{]--[}
 \usepackage{hyperref}
-\hypersetup{colorlinks=true, linkcolor=blue!50!black, urlcolor=blue!60!black, citecolor=blue!50!black}
+\hypersetup{colorlinks=true, linkcolor=blue!50!black, urlcolor=blue!60!black, citecolor=blue!50!black,
+  pdftitle={Elliptic Curve Cryptography in Practice}, pdfauthor={Diellart Mulolli}}
 \setlist{itemsep=0.2em, topsep=0.3em}
 \setlength{\emergencystretch}{2em}
 \newcolumntype{L}{>{\raggedright\arraybackslash}X}
@@ -27,7 +28,7 @@
 
 \title{\textbf{Elliptic Curve Cryptography in Practice}\\[0.3em]
 \large From the ECDLP to TLS, Signal, and the post-quantum transition}
-\author{Diellart Mulolli (230756200035)}
+\author{Diellart Mulolli (230756200035)\\[0.2em] \small Code and LaTeX source: \url{https://github.com/Diellart-Mulolli/ecc-lab}}
 \date{\today}
 
 \begin{document}
@@ -42,8 +43,8 @@ attack, so 256-bit keys give the same security as 3072-bit RSA keys. This report
 mathematics on a toy curve and compares ECC with RSA, then studies how the same curve is used
 for key agreement, signatures and encryption, analyses a real-world failure (the 2024 PuTTY
 P-521 key-recovery vulnerability), and finally discusses the threat of quantum computers and
-how a long-lived system should choose its mechanisms. Small Python scripts (in the folder
-\texttt{ecc\_lab/}) were used to verify the calculations and to measure performance.
+how a long-lived system should choose its mechanisms. Three small Python scripts were used to verify the calculations and to measure performance; they are
+published, together with the LaTeX source of this report and a running guide, at \url{https://github.com/Diellart-Mulolli/ecc-lab}.
 
 %=====================================================================
 \section*{Foundations}
@@ -132,7 +133,8 @@ deprecated and disallowed after 2023.}
 The gap grows because the cost of breaking ECC is fully exponential ($\approx 2^{\ell/2}$ for an
 $\ell$-bit key), so doubling security only needs a doubling of the key size, while the GNFS is
 sub-exponential: the RSA modulus has to grow roughly with the \emph{cube} of the security level
-(from 3072 to 15360 bits, $5\times$, when the security only doubles).
+(up to logarithmic factors). Doubling the security from 128 to 256 bits multiplies the RSA modulus by $5$
+(3072 to 15360 bits) but the ECC key only by $2$ (256 to 512 bits).
 
 \begin{table}[H]
 \textbf{(c)} Measurements made with \texttt{q2\_benchmark.py} (Python \texttt{cryptography} 41,
@@ -183,7 +185,7 @@ Mechanism & Security goal & Inputs / outputs & Fresh randomness? & Standard & Re
 \midrule
 ECDH / X25519 & Key agreement: a shared secret over a public channel (confidentiality, forward secrecy when ephemeral) & In: own private scalar, peer public point. Out: shared point $\to$ KDF $\to$ session keys & Yes, for each ephemeral key pair & RFC 7748, NIST SP 800-56A & TLS 1.3, Signal, WireGuard, SSH \\
 ECDSA & Authenticity, integrity, non-repudiation & Sign: $d$, message $\to (r,s)$. Verify: $Q$, message, $(r,s)\to$ valid/invalid & Yes: secret nonce $k$ per signature (unless RFC 6979) & FIPS 186-5, SEC 1, ANSI X9.62 & X.509/TLS certificates, Bitcoin, Ethereum \\
-EdDSA / Ed25519 & Authenticity, integrity, non-repudiation & Sign: secret key, message $\to (R,S)$ (64 B). Verify: public key, message, signature $\to$ valid/invalid & No: nonce is derived deterministically & RFC 8032, FIPS 186-5 & OpenSSH, Signal (XEdDSA), Tor, Debian/APT, age \\
+EdDSA / Ed25519 & Authenticity, integrity, non-repudiation & Sign: secret key, message $\to (R,S)$ (64 B). Verify: public key, message, signature $\to$ valid/invalid & No: nonce is derived deterministically & RFC 8032, FIPS 186-5 & OpenSSH, Signal (XEdDSA), Tor onion services, OpenBSD signify \\
 ECIES / HPKE & Public-key encryption: confidentiality and integrity to a recipient's public key & In: recipient public key, plaintext, (info, AAD). Out: encapsulated ephemeral key \texttt{enc} + AEAD ciphertext & Yes: a fresh ephemeral key per message & SEC 1, ISO 18033-2; RFC 9180 (HPKE) & TLS ECH, MLS (RFC 9420), Apple iMessage/PQ3, Cloudflare ODoH \\
 \bottomrule
 \end{tabularx}
@@ -299,7 +301,7 @@ This is one reason TLS 1.3 removed RSA key transport.
 \centering\small
 \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{3.6cm}L@{}}
 \toprule
-Discovery and disclosure & Found in early 2024 and reported privately to the PuTTY developers; publicly disclosed on 15 April 2024 together with the fixed release \cite{puttyadv,oss}. \\
+Discovery and disclosure & Reported privately to the PuTTY developers before disclosure; publicly disclosed on 15 April 2024 together with the fixed release \cite{puttyadv,oss}. \\
 Discovered by & Fabian B\"aumer and Marcus Brinkmann, Ruhr University Bochum. \\
 Affected products and scale & PuTTY 0.68--0.80 (2017--2024) and Pageant, and products embedding PuTTY code: FileZilla 3.24.1--3.66.5, WinSCP 5.9.5--6.3.2, TortoiseGit 2.4.0.2--2.15.0, TortoiseSVN 1.10.0--1.14.6. Only \emph{NIST P-521} keys (\texttt{ecdsa-sha2-nistp521}) are affected, but every such key used with these tools over 7 years must be considered compromised. PuTTY is one of the most widely used SSH clients on Windows. \\
 ECC mechanism & ECDSA signature generation, specifically the derivation of the per-signature nonce $k$ (random number generation). \\
@@ -319,7 +321,7 @@ produces only 512 bits. Reducing a 512-bit value modulo a 521-bit $n$ changes no
 \textbf{top 9 bits of every nonce are always zero}. The nonce is biased: it is not uniform in $[1,n-1]$.
 \item Each signature then gives a linear relation $s_i k_i \equiv h_i + r_i d \pmod n$ with a known small bound
 $k_i < 2^{512}$. This is an instance of the \emph{Hidden Number Problem}: with about 60 signatures,
-a lattice built from these equations and reduced with LLL/BKZ reveals $d$ within minutes.
+a lattice built from these equations and reduced with LLL/BKZ reveals $d$.
 \item The attacker needs about 60 signatures and the public key. They can be collected by (i) a malicious or
 compromised SSH server to which the victim logs in (each login produces a signature on data the server knows), or
 (ii) passively from public data, e.g.\ Git commits signed through PuTTY/Pageant and published on GitHub.
@@ -358,8 +360,8 @@ assumptions ($|H| \ge \lceil \log_2 n \rceil + 64$).
 order $n$, define $f(x,y) = xP + yQ = (x+ky)P$. Then $f(x,y) = f(x',y')$ exactly when
 $(x-x') \equiv -k(y-y') \pmod n$, so $f$ is periodic with the hidden period lattice generated by $(k,-1)$ and $(n,0)$.
 A quantum computer evaluates $f$ on a superposition of all $(x,y)$ (the costly part: reversible point addition and
-modular inversion), then applies the quantum Fourier transform; measurement yields pairs $(c,d)$ with
-$c \equiv kd \pmod n$, from which $k = c\,d^{-1} \bmod n$. The cost is polynomial, about $O(\ell^3)$ gates for an $\ell$-bit curve.
+modular inversion), then applies the quantum Fourier transform; measurement yields pairs $(u,v)$ with
+$u \equiv kv \pmod n$, from which $k = u\,v^{-1} \bmod n$. The cost is polynomial, about $O(\ell^3)$ gates for an $\ell$-bit curve.
 \emph{Grover's} algorithm only gives a quadratic speed-up for unstructured search: brute-forcing a 256-bit
 key would take $\approx 2^{128}$ quantum steps, which is no better than Pollard rho classically, and Grover
 does not parallelise well. So Grover is a concern for symmetric keys (and is handled by AES-256), while

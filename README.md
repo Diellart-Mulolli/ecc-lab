@@ -1,9 +1,10 @@
 # ECC Lab – Python scripts and report
 
-**Course:** Information Security, *Elliptic Curve Cryptography in Practice* lab
-**Author:** Diellart Mulolli (230756200035)
+**Course:** Information Security, *Elliptic Curve Cryptography in Practice* lab  
+**Author:** Diellart Mulolli (230756200035)  
+**Repository:** <https://github.com/Diellart-Mulolli/ecc-lab>
 
-This folder contains the lab report (`report.tex` / `report.pdf`) and three small Python
+This repository contains the lab report (`report.tex` / `report.pdf`) and three small Python
 scripts. The scripts check the calculations and claims made in the report:
 
 | Script | Report section | What it shows |
@@ -15,7 +16,8 @@ scripts. The scripts check the calculations and claims made in the report:
 ## Project structure
 
 ```
-ecc_lab/
+ecc-lab/
+├── .gitignore           keeps virtual environments, Python caches and LaTeX build files out of git
 ├── README.md            this file: running guide and explanation of every script
 ├── requirements.txt     Python dependency for q2 (cryptography)
 ├── report.tex           LaTeX source of the report (IEEE references, pdfLaTeX/Overleaf compatible)
@@ -41,8 +43,17 @@ run on any Python 3.8+ installation without installing anything.
 
 ### 2. Set up (once)
 
-Open a terminal in the `ecc_lab` folder. Using a virtual environment keeps the dependency
-separate from the system Python:
+Get the project, either by downloading it from GitHub (*Code → Download ZIP*) or by cloning it:
+
+```bash
+git clone https://github.com/Diellart-Mulolli/ecc-lab.git
+```
+```bash
+cd ecc-lab
+```
+
+Inside the project folder, create a virtual environment. It keeps the dependency separate
+from the system Python:
 
 ```bash
 python3 -m venv .venv
@@ -60,7 +71,7 @@ Run `deactivate` when you are done.
 
 ### 3. Run the scripts
 
-Run each script from inside `ecc_lab` (on Windows, write `py` instead of `python3`).
+Run each script from inside the project folder (on Windows, write `py` instead of `python3`).
 
 | Step | Command | Runtime* | What to look for in the output |
 |---|---|---|---|
