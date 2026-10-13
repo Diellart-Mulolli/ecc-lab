@@ -13,6 +13,7 @@
 \usepackage{array}
 \usepackage{float}
 \usepackage{needspace}
+\usepackage{fancyvrb}
 \usepackage{enumitem}
 \usepackage{xcolor}
 \usepackage{cite}
@@ -44,7 +45,8 @@ mathematics on a toy curve and compares ECC with RSA, then studies how the same 
 for key agreement, signatures and encryption, analyses a real-world failure (the 2024 PuTTY
 P-521 key-recovery vulnerability), and finally discusses the threat of quantum computers and
 how a long-lived system should choose its mechanisms. Three small Python scripts were used to verify the calculations and to measure performance; they are
-published, together with the LaTeX source of this report and a running guide, at \url{https://github.com/Diellart-Mulolli/ecc-lab}.
+published, together with the LaTeX source of this report and a running guide, at \url{https://github.com/Diellart-Mulolli/ecc-lab}. Appendix~A lists the values chosen in each
+script and its exact output.
 
 %=====================================================================
 \section*{Foundations}
@@ -72,6 +74,7 @@ So $3P=(3,3)$. Check: $y^2 = 9 \equiv 4$ and $27+6+1 = 34 \equiv 4$. \checkmark
 by repeatedly adding $P$ and compare each result with $Q$:
 $2P=(1,3)$, $3P=(3,3)$, $4P = 3P + P = (3,2) = Q$.
 Hence $\boxed{k = 4}$. The search needed 3 group operations (one doubling and two additions).
+The script \texttt{q1\_toy\_curve.py} reproduces (a) and (b) exactly (Appendix~A.1).
 Consistency check: $4P = -3P$ since $7P=\infty$, and indeed $(3,2) = -(3,3)$.
 The full cycle is $P=(0,1),\,2P=(1,3),\,3P=(3,3),\,4P=(3,2),\,5P=(1,2),\,6P=(0,4),\,7P=\infty$.
 Brute force needs on average $n/2$ operations; this is trivial for $n=7$ but impossible for $n\approx 2^{256}$.
@@ -138,7 +141,7 @@ sub-exponential: the RSA modulus has to grow roughly with the \emph{cube} of the
 
 \begin{table}[H]
 \textbf{(c)} Measurements made with \texttt{q2\_benchmark.py} (Python \texttt{cryptography} 41,
-OpenSSL backend, one laptop core; average milliseconds per operation) and sizes from the standards
+OpenSSL backend, one laptop core; average milliseconds per operation; settings and raw output in Appendix~A.2) and sizes from the standards
 \cite{rfc8032,fips1865}:\par\smallskip
 \centering\small
 \begin{tabularx}{\textwidth}{@{}l>{\centering\arraybackslash}X>{\centering\arraybackslash}X>{\centering\arraybackslash}X>{\centering\arraybackslash}X>{\centering\arraybackslash}X@{}}
@@ -146,7 +149,7 @@ OpenSSL backend, one laptop core; average milliseconds per operation) and sizes 
 Scheme & Key generation & Signing & Verification & Public key & Signature \\
 \midrule
 RSA-3072 (PSS) & 813 ms (slowest) & 1.39 ms & \textbf{0.09 ms} & 384 B modulus (422 B DER) & 384 B \\
-ECDSA P-256 & 0.06 ms & 0.05 ms & 0.11 ms & 64 B raw (65 B uncompr., 33 B compr.) & 64 B raw ($\approx$70--72 B DER) \\
+ECDSA P-256 & 0.06 ms & 0.05 ms & 0.11 ms & 64 B raw (65 B uncompr., 33 B compr.) & 64 B raw (69--72 B DER) \\
 Ed25519 & 0.07 ms & 0.06 ms & 0.16 ms & 32 B & 64 B \\
 \bottomrule
 \end{tabularx}
@@ -164,7 +167,7 @@ hardware only offers a NIST-certified accelerator). The signer is the constraine
 signing is cheap, needs no random number generator per signature (no Sony-style nonce failure on a cheap
 device), is easy to implement in constant time, and produces 64-byte signatures, which saves radio
 energy compared with 384-byte RSA signatures. The cloud verifies $50\,000/60 \approx 833$ signatures
-per second; at $\approx 0.15$ ms per verification this uses about 12\% of one CPU core, and Ed25519 also
+per second; at $\approx 0.15$ ms per verification this uses about 13\% of one CPU core, and Ed25519 also
 supports batch verification. The answer changes partly in the opposite scenario: if a powerful server
 signs and millions of small devices only verify, RSA's very cheap verification (small $e$) becomes an
 advantage and the large signature size matters less, so RSA-3072 is a reasonable choice (e.g.\ for
@@ -220,9 +223,10 @@ Subtracting eliminates the unknown $d$: $s_1 - s_2 = k^{-1}(h_1 - h_2)$, hence
 Both $h_1, h_2$ are hashes of public messages, so everything on the right-hand side is public. The
 reuse is visible directly: two signatures with an \emph{identical $r$ value} under the same key
 reveal that the same $k$ was used (with a random 256-bit $k$, a repeated $r$ would otherwise happen with
-negligible probability). I verified this with \texttt{q3\_nonce\_reuse.py} on P-256: two signatures with a
-repeated random $k$ were valid, the script recovered $k$ and $d$ exactly, and then forged a valid signature on a
-new message. In the Sony PS3 case this allowed fail0verflow to sign arbitrary software \cite{ps3}.
+negligible probability). I verified this with \texttt{q3\_nonce\_reuse.py} on P-256 (run with \texttt{-{}-seed 2026}; all chosen
+values and the full output are in Appendix~A.3): both signatures share $r = \texttt{0x45f4\ldots 0b8e}$ and are valid,
+also when checked with OpenSSL; the two formulas above return exactly the $k$ and $d$ that were used; and the
+recovered key forges a valid signature on a new message. In the Sony PS3 case this allowed fail0verflow to sign arbitrary software \cite{ps3}.
 
 \textbf{(d)} \emph{EdDSA} (RFC 8032) hashes the 32-byte secret key with SHA-512; the second half
 of the output is a secret \texttt{prefix}. The per-signature value is
@@ -420,6 +424,149 @@ man-in-the-middle attacks. Its biggest limitation is the quantum threat: Shor's 
 probably with fewer resources than RSA, and recorded ECDH traffic is already exposed to harvest-now-decrypt-later.
 The right path for the coming decade is hybrid cryptography (X25519 + ML-KEM, ECDSA + ML-DSA) and crypto-agility, so
 that ECC is kept as a well-understood safety net while post-quantum algorithms mature.
+
+%=====================================================================
+\clearpage
+\section*{Appendix A --- Python Verification: Chosen Values and Outputs}
+The three scripts are in the repository \url{https://github.com/Diellart-Mulolli/ecc-lab} (see its README for the
+running guide). They were run with Python~3.12.3 and the \texttt{cryptography} package~41.0.7 (OpenSSL backend).
+The outputs below are copied unchanged from the terminal. In addition, every value was cross-checked independently:
+the toy-curve results by a second computation along a different path, and the P-256 values with OpenSSL
+(through \texttt{cryptography}) and the system \texttt{sha256sum} tool.
+
+\subsection*{A.1 \texttt{q1\_toy\_curve.py} (Question 1)}
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}P{4.2cm}L@{}}
+\toprule
+Chosen value & Setting in the code \\
+\midrule
+Curve & $E: y^2 \equiv x^3 + ax + b \pmod p$ with $p = 5$, $a = 2$, $b = 1$ (lab handout, Stamp Sec.~4.5.1) \\
+Base point and public key & $P = (0,1)$, $Q = (3,2)$ \\
+Point at infinity & represented by \texttt{None}, printed as \texttt{inf} \\
+Group law & slope formulas of Stamp, Table~4.1; inverses with \texttt{pow(x, -1, p)} \\
+Method for (b) & exhaustive search: add $P$ repeatedly until the result equals $Q$ \\
+\bottomrule
+\end{tabularx}
+\end{table}
+Command: \texttt{python3 q1\_toy\_curve.py}
+\begin{Verbatim}[fontsize=\footnotesize, frame=single]
+Affine points: [(0, 1), (0, 4), (1, 2), (1, 3), (3, 2), (3, 3)] + infinity; #E = 7
+
+(a)
+  (0, 1) + (0, 1) (doubling): m = 2 * 2^-1 = 1, x3 = 1^2 - 0 - 0 = 1, y3 = 1(0 - 1) - 1 = 3
+  2P = (1, 3) on curve: True
+  (1, 3) + (0, 1) (addition): m = 3 * 4^-1 = 2, x3 = 2^2 - 1 - 0 = 3, y3 = 2(1 - 3) - 3 = 3
+  3P = (3, 3) on curve: True
+
+(b) brute force for Q = (3, 2)
+  2P = (1, 3)
+  3P = (3, 3)
+  4P = (3, 2)
+  k = 4, found after 3 point additions/doublings
+
+All multiples of P:
+  1P = (0, 1)
+  2P = (1, 3)
+  3P = (3, 3)
+  4P = (3, 2)
+  5P = (1, 2)
+  6P = (0, 4)
+  7P = inf
+  8P = (0, 1)
+\end{Verbatim}
+\textbf{Check.} The six affine points match the set in the lab handout, and $\#E = 7$. The slopes $m = 1$ and $m = 2$,
+the points $2P = (1,3)$ and $3P = (3,3)$, and $k = 4$ after 3 operations are the hand results of Question~1(a)--(b).
+$7P = \infty$ confirms that $P$ has order 7. Independent cross-check: computing $4P$ as the doubling $2(2P)$ instead of
+$3P + P$ also gives $(3,2)$, and counting points with Euler's criterion also gives $\#E = 7$.
+
+\subsection*{A.2 \texttt{q2\_benchmark.py} (Question 2(c))}
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}P{4.2cm}L@{}}
+\toprule
+Chosen value & Setting in the code \\
+\midrule
+Signed message & \texttt{"sensor reading:\ 21.4 C, 48 \% RH"} (31 bytes) \\
+RSA & 3072-bit modulus, $e = 65537$, RSA-PSS with MGF1-SHA-256, 32-byte salt, SHA-256 \\
+ECDSA & curve P-256 (\texttt{secp256r1}), SHA-256, DER-encoded signature \\
+EdDSA & Ed25519 (RFC 8032, SHA-512 internally) \\
+Repetitions & key generation: 5 for RSA, 500 for ECDSA and Ed25519; signing and verification: 300 each \\
+Measurement & \texttt{time.perf\_counter()}, mean time per operation in ms; key sizes as X.509 DER (\texttt{SubjectPublicKeyInfo}) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+Command: \texttt{python3 q2\_benchmark.py} (the run used for Table~2)
+\begin{Verbatim}[fontsize=\footnotesize, frame=single]
+scheme            keygen ms   sign ms  verify ms  pk DER B  sig B
+RSA-3072 (PSS)      813.091     1.386      0.092       422    384
+ECDSA P-256           0.058     0.047      0.114        91     72
+Ed25519               0.067     0.060      0.155        44     64
+
+P-256 public key: uncompressed 65 B, compressed 33 B
+Ed25519 public key raw: 32 B
+\end{Verbatim}
+\textbf{Check.} Table~2 rounds these numbers. Timings change from run to run (three runs gave RSA key generation
+times of 356, 813 and 1086~ms), but the order is always the same: RSA is slowest at key generation and signing and
+fastest at verification. Derived values: $813.091/0.058 \approx 14\,000$ (four orders of magnitude),
+$1.386/0.047 \approx 29$ and $1.386/0.060 \approx 23$ (signing $\approx 25\times$ slower), and
+$50\,000/60 \cdot 0.155~\text{ms} \approx 0.13$~s of CPU time per second ($\approx 13\%$). The sizes were confirmed
+separately: RSA-3072 modulus and signature 384~B, DER public keys 422~B (RSA), 91~B (P-256) and 44~B (Ed25519).
+DER-encoded ECDSA signatures varied between 69 and 72~B over 200 signatures, because DER drops leading zero bytes of
+$r$ and $s$ and adds a sign byte when the top bit is set.
+
+\clearpage
+\subsection*{A.3 \texttt{q3\_nonce\_reuse.py} (Question 3(c))}
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}P{3.4cm}L@{}}
+\toprule
+Chosen value & Setting in the code \\
+\midrule
+Curve & NIST P-256 \cite{fips1865,sp800186}: $p = 2^{256} - 2^{224} + 2^{192} + 2^{96} - 1$, $a = -3$ \\
+\quad $p$ & \texttt{0xffffffff00000001000000000000000000000000ffffffffffffffffffffffff} \\
+\quad order $n$ & \texttt{0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551} \\
+\quad $G_x$ & \texttt{0x6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296} \\
+\quad $G_y$ & \texttt{0x4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5} \\
+Hash & $h = \text{SHA-256}(m)$ read as an integer, reduced mod $n$ \\
+Messages & $m_1 = \texttt{"firmware 3.55"}$, $m_2 = \texttt{"homebrew loader"}$ \\
+Private key $d$, nonce $k$ & uniform in $[1, n-1]$ from Python's \texttt{random.Random(2026)} (\texttt{-{}-seed 2026}, for reproducibility only; without the option the script uses the cryptographic \texttt{secrets} module) \\
+Scalar multiplication & left-to-right double-and-add (demonstration only, not constant-time) \\
+Forgery & message \texttt{"anything the attacker wants"} signed with the recovered $d$ and nonce 12345 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+Command: \texttt{python3 q3\_nonce\_reuse.py -{}-seed 2026}
+\begin{Verbatim}[fontsize=\footnotesize, frame=single]
+victim private key d = 0xf3f49249dc28ff90a5aec7978306d03bf38b2ffc80a4df5a51c9bc701e7ea41a
+reused nonce       k = 0x6bad6be28e7aa6e99f19950499dd251de512148239292d22e255accb1a466885
+signature 1 on 'firmware 3.55':
+  h1 = 0xba2c60557cd36927df60802fa63d01ff7bccb978daee9847b797aedbafcd7bbc
+  r1 = 0x45f4600c8a058ddaea76061d9eb761b67b7799eb14fbf231d21bf31f95c60b8e
+  s1 = 0xa22af549b244c43a15a430634a4d87ff55eb0dcbc0ba4c7bd8e1eaa53b1ea7b8
+signature 2 on 'homebrew loader':
+  h2 = 0xaabb15092f5617c4891d2a5517315f2069371074a2af28a33484e2c0de2576b2
+  r2 = 0x45f4600c8a058ddaea76061d9eb761b67b7799eb14fbf231d21bf31f95c60b8e
+  s2 = 0x33ccd118c13f82ff4ed22302c5f1b2477997f28853e00b7295e2aca1da1edb11
+both signatures valid: True True
+r1 == r2 (visible reuse): True
+recovered k = 0x6bad6be28e7aa6e99f19950499dd251de512148239292d22e255accb1a466885
+recovered d = 0xf3f49249dc28ff90a5aec7978306d03bf38b2ffc80a4df5a51c9bc701e7ea41a
+recovered k correct: True
+recovered d correct: True
+forged signature verifies: True
+\end{Verbatim}
+\textbf{Check.} $r_1 = r_2$ exposes the reused nonce. Inserting the printed values into the formulas of Question~3(c):
+\begin{align*}
+k &= (h_1 - h_2)(s_1 - s_2)^{-1} \bmod n\\
+  &= \text{\small\texttt{0x6bad6be28e7aa6e99f19950499dd251de512148239292d22e255accb1a466885}},\\
+d &= (s_1 k - h_1)\, r^{-1} \bmod n\\
+  &= \text{\small\texttt{0xf3f49249dc28ff90a5aec7978306d03bf38b2ffc80a4df5a51c9bc701e7ea41a}},
+\end{align*}
+which are exactly the nonce and private key chosen by the script. Independent cross-checks with OpenSSL: the
+generator $G$ in the script equals OpenSSL's P-256 generator; $x(kG) \bmod n$ computed by OpenSSL equals $r$; both
+signatures are accepted by OpenSSL's ECDSA verification under $Q = dG$; and $h_1$, $h_2$ equal the
+\texttt{sha256sum} digests of the two messages.
 
 \clearpage
 \begin{thebibliography}{99}

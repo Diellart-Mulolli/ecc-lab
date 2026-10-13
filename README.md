@@ -21,7 +21,7 @@ ecc-lab/
 ├── README.md            this file: running guide and explanation of every script
 ├── requirements.txt     Python dependency for q2 (cryptography)
 ├── report.tex           LaTeX source of the report (IEEE references, pdfLaTeX/Overleaf compatible)
-├── report.pdf           compiled report, 10 pages
+├── report.pdf           compiled report, 13 pages (Appendix A: script values and outputs)
 ├── q1_toy_curve.py      Q1: point arithmetic on y^2 = x^3 + 2x + 1 (mod 5), brute-force ECDLP
 ├── q2_benchmark.py      Q2: RSA-3072 vs ECDSA P-256 vs Ed25519 timing and sizes
 └── q3_nonce_reuse.py    Q3: ECDSA private-key recovery from a reused nonce on NIST P-256
@@ -76,8 +76,8 @@ Run each script from inside the project folder (on Windows, write `py` instead o
 | Step | Command | Runtime* | What to look for in the output |
 |---|---|---|---|
 | 1 | `python3 q1_toy_curve.py` | < 0.1 s | `2P = (1, 3)`, `3P = (3, 3)`, both `on curve: True`; `k = 4, found after 3 point additions/doublings`; `7P = inf` |
-| 2 | `python3 q3_nonce_reuse.py` | ≈ 0.2 s | five lines, all ending in `True`, the last being `forged signature verifies: True` |
-| 3 | `python3 q2_benchmark.py` | ≈ 4 s | a table where RSA has the slowest key generation and the fastest verification; signature sizes 384 / 70–72 / 64 bytes |
+| 2 | `python3 q3_nonce_reuse.py --seed 2026` | ≈ 0.2 s | exactly the values printed in the report's Appendix A.3, and five checks ending in `True`, the last being `forged signature verifies: True` |
+| 3 | `python3 q2_benchmark.py` | ≈ 4 s | a table where RSA has the slowest key generation and the fastest verification; signature sizes 384 / 69–72 / 64 bytes |
 
 \*Measured on the author's laptop. `q2` takes longest because it generates five RSA-3072
 key pairs.
@@ -211,7 +211,7 @@ absolute numbers differ, but the conclusions are the same.
 | **RSA signing is ~20–30× slower** | Signing computes `m^d mod N` with a 3072-bit private exponent (sped up with CRT). ECC signing does one 256-bit scalar multiplication. |
 | **RSA verification is the fastest operation in the table** | The public exponent is e = 65537 = 2¹⁶ + 1, so verification takes only 17 modular multiplications. ECDSA and Ed25519 verification each need a *double* scalar multiplication with full 256-bit scalars. This is the "one operation where RSA is faster" asked for in Question 2(c). |
 | **Public keys: 422 B vs 91 B vs 44 B** (DER) | Most of the RSA key is the 384-byte modulus. A P-256 key is a 65-byte uncompressed point (`04‖x‖y`, or 33 bytes compressed). An Ed25519 key is a 32-byte encoded point. The rest of each DER size is the algorithm identifier wrapper. |
-| **Signatures: 384 B vs 70–72 B vs 64 B** | An RSA signature is always as long as the modulus. An ECDSA signature is two 32-byte integers `(r, s)` = 64 bytes raw, but in DER each integer gets a tag and length, plus a leading zero byte if its top bit is set. That is why it is **71 bytes in this run and 72 in the earlier one**. Ed25519 signatures are always exactly 64 bytes `(R, S)`. |
+| **Signatures: 384 B vs 69–72 B vs 64 B** | An RSA signature is always as long as the modulus. An ECDSA signature is two 32-byte integers `(r, s)` = 64 bytes raw, but in DER each integer gets a tag and length, plus a leading zero byte if its top bit is set. That is why it is **71 bytes in this run and 72 in the earlier one**; over 200 signatures the length ranged from 69 to 72 bytes. Ed25519 signatures are always exactly 64 bytes `(R, S)`. |
 
 These results support the recommendation in Question 2(d). For a battery-powered sensor
 that *signs*, Ed25519/ECDSA is much cheaper and its signatures are 6× smaller to transmit.
@@ -236,7 +236,8 @@ domain parameters from FIPS 186-5 / SP 800-186:
 It then repeats Sony's mistake:
 
 1. It generates a random private key `d` and public key `Q = dG`.
-2. It picks **one** random nonce `k` and uses it to sign two different messages.
+2. It picks **one** random nonce `k` and uses it to sign two different messages,
+   `"firmware 3.55"` and `"homebrew loader"` (hashed with SHA-256).
 3. As the attacker, it uses only the public data (r, s₁, s₂, h₁, h₂) to compute
 
    k = (h₁ − h₂)(s₁ − s₂)⁻¹ mod n
@@ -245,26 +246,51 @@ It then repeats Sony's mistake:
 4. It uses the recovered `d` to sign a new message of the attacker's choice, and checks
    that this signature verifies under the victim's public key.
 
-### Output
+### Random or reproducible values
+
+- `python3 q3_nonce_reuse.py` draws `d` and `k` with Python's cryptographic `secrets`
+  module, so every run shows different numbers.
+- `python3 q3_nonce_reuse.py --seed 2026` draws them from `random.Random(2026)` instead,
+  so the numbers are the same every time. **The report (Appendix A.3) uses this run.**
+  A seeded generator is fine for a demonstration, but must never be used for real keys.
+
+### Output (`--seed 2026`, as in the report)
 
 ```
+victim private key d = 0xf3f49249dc28ff90a5aec7978306d03bf38b2ffc80a4df5a51c9bc701e7ea41a
+reused nonce       k = 0x6bad6be28e7aa6e99f19950499dd251de512148239292d22e255accb1a466885
+signature 1 on 'firmware 3.55':
+  h1 = 0xba2c60557cd36927df60802fa63d01ff7bccb978daee9847b797aedbafcd7bbc
+  r1 = 0x45f4600c8a058ddaea76061d9eb761b67b7799eb14fbf231d21bf31f95c60b8e
+  s1 = 0xa22af549b244c43a15a430634a4d87ff55eb0dcbc0ba4c7bd8e1eaa53b1ea7b8
+signature 2 on 'homebrew loader':
+  h2 = 0xaabb15092f5617c4891d2a5517315f2069371074a2af28a33484e2c0de2576b2
+  r2 = 0x45f4600c8a058ddaea76061d9eb761b67b7799eb14fbf231d21bf31f95c60b8e
+  s2 = 0x33ccd118c13f82ff4ed22302c5f1b2477997f28853e00b7295e2aca1da1edb11
 both signatures valid: True True
 r1 == r2 (visible reuse): True
+recovered k = 0x6bad6be28e7aa6e99f19950499dd251de512148239292d22e255accb1a466885
+recovered d = 0xf3f49249dc28ff90a5aec7978306d03bf38b2ffc80a4df5a51c9bc701e7ea41a
 recovered k correct: True
 recovered d correct: True
 forged signature verifies: True
 ```
 
-`d` and `k` are random on every run, but the output is always the same five `True` lines.
+The hex values change with the seed, but the five checks at the end are always `True`.
+These values were also checked independently with OpenSSL: it accepts both signatures under
+Q = dG, its own computation of x(kG) mod n equals r, and `h1`/`h2` equal the `sha256sum`
+digests of the two messages.
 
 ### What the output means
 
 | Line | Meaning |
 |---|---|
+| `victim private key d`, `reused nonce k` | The secrets the script chose. A real attacker never sees these; they are printed only so the recovery can be checked. |
+| `h1`, `r1`, `s1` / `h2`, `r2`, `s2` | The public data: the message hashes and the two signatures (r, s). This is all the attacker uses. |
 | `both signatures valid: True True` | Both signatures are correct ECDSA signatures and pass normal verification. Nonce reuse does **not** make signatures look invalid, so the victim notices nothing. |
 | `r1 == r2 (visible reuse): True` | Because r depends only on k (r = x(kG) mod n), reusing k gives the same r. Anyone can spot this by comparing public signatures. With a random 256-bit k, a repeated r would happen with probability about 2⁻²⁵⁶. |
-| `recovered k correct: True` | Subtracting the two equations for s cancels the unknown private key: s₁ − s₂ = k⁻¹(h₁ − h₂). This gives k from public values only. |
-| `recovered d correct: True` | Once k is known, d = (s₁k − h₁)/r. **The private key is fully recovered.** Pollard's rho would need about 2¹²⁸ operations; this attack needs two modular inversions. |
+| `recovered k = …`, `recovered k correct: True` | Subtracting the two equations for s cancels the unknown private key: s₁ − s₂ = k⁻¹(h₁ − h₂). This gives k from public values only. |
+| `recovered d = …`, `recovered d correct: True` | Once k is known, d = (s₁k − h₁)/r. **The private key is fully recovered.** Pollard's rho would need about 2¹²⁸ operations; this attack needs two modular inversions. |
 | `forged signature verifies: True` | The attacker can now sign *anything* as the victim. The victim's public key accepts a signature on `"anything the attacker wants"`. For Sony, this meant anyone could sign homebrew software as if it were official PS3 firmware. |
 
 This supports the main lesson of Questions 3(d) and 5: the attack does **not** break the

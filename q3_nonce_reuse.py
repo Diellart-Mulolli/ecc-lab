@@ -1,6 +1,12 @@
-"""Question 3(c): recovering an ECDSA private key from two signatures that reuse k (P-256)."""
+"""Question 3(c): recovering an ECDSA private key from two signatures that reuse k (P-256).
+
+Usage: python3 q3_nonce_reuse.py           fresh random key and nonce on every run
+       python3 q3_nonce_reuse.py --seed N  reproducible values (the report uses --seed 2026)
+"""
 import hashlib
+import random
 import secrets
+import sys
 
 # NIST P-256 domain parameters (FIPS 186-5 / SP 800-186)
 p = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF
@@ -52,19 +58,38 @@ def verify(Q, msg, r, s):
     return X is not None and X[0] % n == r
 
 
-d = secrets.randbelow(n - 1) + 1
+if len(sys.argv) == 3 and sys.argv[1] == "--seed":
+    rng = random.Random(int(sys.argv[2]))  # reproducible demo only, never for real keys
+    rand_scalar = lambda: rng.randrange(1, n)
+else:
+    rand_scalar = lambda: secrets.randbelow(n - 1) + 1
+
+d = rand_scalar()
 Q = mul(d, G)
-k = secrets.randbelow(n - 1) + 1  # the "constant" Sony-style nonce
+k = rand_scalar()  # the "constant" Sony-style nonce
 
 m1, m2 = b"firmware 3.55", b"homebrew loader"
 r1, s1 = sign(d, m1, k)
 r2, s2 = sign(d, m2, k)
+h1, h2 = h(m1), h(m2)
+
+print("victim private key d =", hex(d))
+print("reused nonce       k =", hex(k))
+print(f"signature 1 on {m1.decode()!r}:")
+print("  h1 =", hex(h1))
+print("  r1 =", hex(r1))
+print("  s1 =", hex(s1))
+print(f"signature 2 on {m2.decode()!r}:")
+print("  h2 =", hex(h2))
+print("  r2 =", hex(r2))
+print("  s2 =", hex(s2))
 print("both signatures valid:", verify(Q, m1, r1, s1), verify(Q, m2, r2, s2))
 print("r1 == r2 (visible reuse):", r1 == r2)
 
-h1, h2 = h(m1), h(m2)
 k_rec = (h1 - h2) * pow(s1 - s2, -1, n) % n
 d_rec = (s1 * k_rec - h1) * pow(r1, -1, n) % n
+print("recovered k =", hex(k_rec))
+print("recovered d =", hex(d_rec))
 print("recovered k correct:", k_rec == k)
 print("recovered d correct:", d_rec == d)
 
